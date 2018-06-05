@@ -8,7 +8,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"math/big"
 	"strings"
 )
 
@@ -38,9 +37,8 @@ func (a *rs256Algorithm) encodeHeader() []byte {
 		base64.URLEncoding.Encode(dst, src)
 		return dst
 	}
-	n := base64.URLEncoding.EncodeToString(a.publicKey.N.Bytes())
-	e := base64.URLEncoding.EncodeToString(big.NewInt(int64(a.publicKey.E)).Bytes())
-	jsonHeader := fmt.Sprintf(`{"alg":"RS256","jwk":{"alg":"RS256","key_ops":["verify"],"kty":"RSA","n":%q,"e":%q}}`, n, e)
+
+	jsonHeader := fmt.Sprintf(`{"alg":"RS256"}`)
 	a.base64Head = make([]byte, base64.URLEncoding.EncodedLen(len(jsonHeader)))
 	base64.URLEncoding.Encode(a.base64Head, []byte(jsonHeader))
 	return a.base64Head
@@ -59,7 +57,7 @@ func (a *rs256Algorithm) Sign(data []byte) (string, error) {
 	signedMessage := make([]byte,
 		len(header)+
 			e.EncodedLen(len(data))+
-			e.EncodedLen((a.privateKey.N.BitLen() + 7) / 8)+
+			e.EncodedLen((a.privateKey.N.BitLen()+7)/8)+
 			2 /*dots between the three parts*/)
 
 	fmt.Printf("len(header) = %d\n", len(header))
@@ -94,21 +92,21 @@ func (a *rs256Algorithm) Sign(data []byte) (string, error) {
 }
 
 func (a *rs256Algorithm) Verify(message string) ([]byte, error) {
-	cursor := strings.LastIndexByte(message, '.')
+	payloadEnd := strings.LastIndexByte(message, '.')
 
-	if cursor == -1 {
+	if payloadEnd == -1 {
 		return nil, errors.New("invalid message")
 	}
 
-	digest := sha256.Sum256([]byte(message[:cursor]))
+	digest := sha256.Sum256([]byte(message[:payloadEnd]))
 
-	err := rsa.VerifyPKCS1v15(a.publicKey, crypto.SHA3_256, digest[:], []byte(message[cursor+1:]))
+	err := rsa.VerifyPKCS1v15(a.publicKey, crypto.SHA3_256, digest[:], []byte(message[payloadEnd+1:]))
 
 	if err != nil {
 		return nil, err
 	}
 
-	payloadPos := strings.IndexByte(message, '.') + 1
+	payloadStart := strings.IndexByte(message, '.') + 1
 
-	return base64.URLEncoding.DecodeString(message[payloadPos:cursor])
+	return base64.URLEncoding.DecodeString(message[payloadStart:payloadEnd])
 }
