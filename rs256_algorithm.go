@@ -60,17 +60,13 @@ func (a *rs256Algorithm) Sign(data []byte) (string, error) {
 			e.EncodedLen((a.privateKey.N.BitLen()+7)/8)+
 			2 /*dots between the three parts*/)
 
-	fmt.Printf("len(header) = %d\n", len(header))
 	cursor += copy(signedMessage[cursor:], header)
-	fmt.Printf("cursor = %d\n", cursor)
+
 	signedMessage[cursor] = '.'
 	cursor++
-	fmt.Printf("cursor = %d\n", cursor)
 
 	base64.URLEncoding.Encode(signedMessage[cursor:], data)
 	cursor += e.EncodedLen(len(data))
-
-	fmt.Printf("message yet %q", string(signedMessage[:cursor]))
 
 	digest := sha256.Sum256(signedMessage[:cursor])
 
@@ -81,11 +77,6 @@ func (a *rs256Algorithm) Sign(data []byte) (string, error) {
 
 	signedMessage[cursor] = '.'
 	cursor++
-
-	fmt.Printf("cursor = %d\n", cursor)
-
-	fmt.Printf("signature %q\n", base64.URLEncoding.EncodeToString(digest[:]))
-	fmt.Printf("sha256.Size %d, digest size %d, signature %d\n", sha256.Size, len(digest), len(signature))
 
 	base64.URLEncoding.Encode(signedMessage[cursor:], signature)
 	return string(signedMessage), nil
@@ -99,8 +90,12 @@ func (a *rs256Algorithm) Verify(message string) ([]byte, error) {
 	}
 
 	digest := sha256.Sum256([]byte(message[:payloadEnd]))
+	signature, err := base64.URLEncoding.DecodeString(message[payloadEnd+1:])
+	if err != nil {
+		return nil, err
+	}
 
-	err := rsa.VerifyPKCS1v15(a.publicKey, crypto.SHA3_256, digest[:], []byte(message[payloadEnd+1:]))
+	err = rsa.VerifyPKCS1v15(a.publicKey, crypto.SHA256, digest[:], signature)
 
 	if err != nil {
 		return nil, err
